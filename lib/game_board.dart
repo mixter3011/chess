@@ -29,6 +29,10 @@ class _GameBoardState extends State<GameBoard> {
   // Default value -1 indicated no piece is currently selected; 
   int selectedCol = -1;
 
+  // A list of valid moves for the currently selected piece
+  // each move is represented as a list with 2 elements: row and col
+  List<List<int>> validMoves = [];
+
   @override
   void initState() {
     super.initState();
@@ -157,8 +161,221 @@ class _GameBoardState extends State<GameBoard> {
         selectedRow = row;
         selectedCol = col;
       }
+
+      // if selected piece has a valid move then move there 
+      else if (selectedPiece != null &&
+          validMoves.any((element) => element[0] == row && element[1] == col)) {
+        movePiece(row, col);
+          }
+
+      // if a piece is selected, calculate it's valid moves
+      validMoves = 
+            calcualteRawValidMoves(selectedRow, selectedCol, selectedPiece);
     });
   }
+
+  // CALCULATE RAW VALID MOVES
+  List<List<int>> calcualteRawValidMoves(int row, int col, ChessPiece? piece) {
+    List<List<int>> candidateMoves = [];
+
+    if (piece == null) {
+      return [];
+    }
+    
+
+    // different directions based on their color
+    int direction = piece.isWhite ? -1 : 1;
+
+    switch (piece.type) {
+      case ChessPieceType.pawn:
+        // pawns can move forward if the square is not occupied
+        if (isInBoard(row + direction, col) &&
+            board[row + direction][col] == null) {
+          candidateMoves.add([row + direction, col]);
+            }
+
+        // pawns can move 2 squares forward if they are at theitr initial position
+        if ((row == 1 && !piece.isWhite) || (row == 6 && piece.isWhite)) {
+          if (isInBoard( row + 2 * direction, col) &&
+              board[row + 2 * direction][col] == null &&
+              board[row + direction][col] == null) {
+            candidateMoves.add([row + 2 & direction, col]);
+          }
+        }
+
+        // pawns can kill diagonally
+        if (isInBoard(row + direction, col - 1) &&
+            board[row + direction][col - 1] != null &&
+            board[row + direction][col - 1]!.isWhite) {
+          candidateMoves.add([row + direction, col - 1]);
+        }
+        if (isInBoard(row + direction, col + 1) &&
+            board[row + direction][col + 1] != null &&
+            board[row + direction][col + 1]!.isWhite) {
+          candidateMoves.add([row + direction, col + 1]);
+        }
+        break;
+      case ChessPieceType.rook:
+        // horizontal and vertical directions
+        var directions = [
+          [-1,0],
+          [1,0],
+          [0,-1],
+          [0,1],
+        ];
+        for (var direction in directions) {
+          var i = 1;
+          while(true) {
+            var newRow = row + i * direction[0];
+            var newCol = col + i * direction[1];
+            if (!isInBoard(newRow, newCol)) {
+              break;
+            } 
+            if (board[newRow][newCol] != null) {
+              if (board[newRow][newCol]!.isWhite  != piece.isWhite) {
+                candidateMoves.add([newRow,newCol]); // kill 
+              }
+              break; // blocked 
+            }
+            candidateMoves.add([newRow, newCol]);
+            i++;
+          }
+        }
+        break;
+      case ChessPieceType.knight:
+        // all eight possible L shape the knight can move
+        var knightMoves = [
+          [-2, -1],
+          [-2, 1],
+          [-1, -2],
+          [-1, 2],
+          [1, -2],
+          [1, 2],
+          [2, -1],
+          [2,1],
+        ];
+
+        for (var move in knightMoves) {
+          var newRow = row + move[0];
+          var newCol = col + move[1];
+          if (!isInBoard(newRow, newCol)) {
+            continue;
+          }
+          if (board[newRow][newCol] != null) {
+            if (board[newRow][newCol] !.isWhite != piece.isWhite) {
+              candidateMoves.add([newRow, newCol]);
+            }
+            continue;
+          }
+          candidateMoves.add([newRow, newCol]);
+        }
+        break;
+      case ChessPieceType.bishop:
+        // diagonal directions
+        var directions = [
+          [-1,-1],
+          [-1, 1],
+          [1, -1],
+          [1,1],
+        ];
+
+        for (var direction in directions) {
+          var i = 1;
+          while (true) {
+            var newRow = row + i * direction[0];
+            var newCol = col + i * direction[1];
+            if (!isInBoard(newRow, newCol)) {
+              if (board[newRow][newCol]!.isWhite != piece.isWhite) {
+                candidateMoves.add([newRow, newCol]);
+              }
+              break;
+            }  
+            candidateMoves.add([newRow, newCol]);
+            i++;
+          }
+        }
+        break;
+      case ChessPieceType.queen:
+        // all directions
+        var directions = [
+          [-1,0],
+          [1,0],
+          [0,-1],
+          [0,1],
+          [-1,-1],
+          [-1,1],
+          [1,-1],
+          [1,1],
+        ];
+        for (var direction in directions) {
+          var i = 1;
+          while (true) {
+            var newRow = row + i * direction[0];
+            var newCol = col + i * direction[1];
+            if (!isInBoard(newRow, newCol)) {
+              break;
+            }
+            if (board[newRow][newCol] != null) {
+              if (board[newRow][newCol] !.isWhite != piece.isWhite) {
+                candidateMoves.add([newRow, newCol]);
+              }
+              break;
+            }
+            candidateMoves.add([newRow, newCol]);
+            i++;
+          }
+        }
+        break;
+      case ChessPieceType.king:
+        // all directions
+        var directions = [
+          [-1,0],
+          [1,0],
+          [0,-1],
+          [0,1],
+          [-1,-1],
+          [-1,1],
+          [1,-1],
+          [1,1],
+        ];
+
+        for (var direction in directions) {
+          var newRow = row + direction[0];
+          var newCol = col + direction[1];
+          if (!isInBoard(newRow, newCol)) {
+            continue;
+          }
+          if (board[newRow][newCol] != null) {
+            if (board[newRow][newCol]!.isWhite != piece.isWhite) {
+              candidateMoves.add([newRow, newCol]);
+            }
+            continue; 
+          }
+
+          candidateMoves.add([newRow, newCol]);
+        }
+        break;
+      default:
+    }
+
+    return candidateMoves;
+  }
+  
+  // MOVE PIECE
+  void movePiece(int newRow, int newCol) {
+    // move the piece and clear the old spot
+    board[newRow][newCol] = selectedPiece;
+    board[selectedRow][selectedCol] = null;
+
+    // clear selection
+    setState((){
+      selectedPiece = null;
+      selectedRow = -1;
+      selectedCol = -1;
+      validMoves = [];
+    }); 
+  }
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -175,10 +392,20 @@ class _GameBoardState extends State<GameBoard> {
           // check if this square is selected
           bool isSelected = selectedRow == row && selectedCol == col;
 
+
+          // check if this square is a valid move
+          bool isValidMove = false;
+          for (var position in validMoves) {
+            // compare row and col
+            if (position[0] == row && position[1] == col) {
+              isValidMove = true;
+            }
+          }
           return Square(
             isWhite: isWhite(index),
             piece: board[row][col],
             isSelected: isSelected,
+            isValidMove: isValidMove,
             onTap: () => pieceSelected(row, col),
           );
         },

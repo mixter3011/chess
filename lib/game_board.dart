@@ -197,7 +197,7 @@ class _GameBoardState extends State<GameBoard> {
 
       // if a piece is selected, calculate it's valid moves
       validMoves = 
-            calcualteRawValidMoves(selectedRow, selectedCol, selectedPiece);
+            calcualteRealValidMoves(selectedRow, selectedCol, selectedPiece, true);
     });
   }
 
@@ -402,7 +402,7 @@ class _GameBoardState extends State<GameBoard> {
         int endCol = move[1];
 
         // this will simulate the future move to see if it's safe
-        if (simulatedMoveIsSafe()) {
+        if (simulatedMoveIsSafe(piece!, row, col, endRow, endCol)) {
           realValidMoves.add(move);
         }
       }
@@ -412,6 +412,7 @@ class _GameBoardState extends State<GameBoard> {
 
     return realValidMoves;
   }
+  
   // MOVE PIECE
   void movePiece(int newRow, int newCol) {
     // if the new spot has an enemy piece
@@ -455,7 +456,24 @@ class _GameBoardState extends State<GameBoard> {
       selectedRow = -1;
       selectedCol = -1;
       validMoves = [];
-    }); 
+    });
+
+    // check if it's check mate
+    if (isCheckMate(!isWhiteTurn)) {
+      showDialog(
+        context: context, 
+        builder: (context) => AlertDialog(
+          title: const Text("CHECK MATE!"),
+          actions: [
+            // play again button
+            TextButton(
+              onPressed: resetGame, 
+              child: const Text("PLAY AGAIN"),
+            ),
+          ],
+        ),
+      );
+    }
 
     // change turn
     isWhiteTurn = !isWhiteTurn;
@@ -475,7 +493,7 @@ class _GameBoardState extends State<GameBoard> {
           continue;
         }
 
-        List<List<int>> pieceValidMoves = calcualteRawValidMoves(i, j, board[i][j]);
+        List<List<int>> pieceValidMoves = calcualteRealValidMoves(i, j, board[i][j], false);
 
         // check if the king's position is in this piece's valid moves
         if (pieceValidMoves.any((move) => 
@@ -498,10 +516,82 @@ class _GameBoardState extends State<GameBoard> {
     // if the piecce is the king, save it's current position and update to the new one
     List<int>? originalKingPosition;
     if (piece.type == ChessPieceType.king) {
-      
-    }
+      originalKingPosition = piece.isWhite ? whiteKingPosition : blackKingPosition;
+
+      // update the king position
+      if (piece.isWhite) {
+        whiteKingPosition = [endRow, endCol];
+      } else {
+        blackKingPosition = [endRow, endCol];
       }
-  )
+    }
+
+    // simulate the move
+    board[endRow][endCol] = piece;
+    board[startRow][startCol] = null;
+
+    // check if our own is under attack
+    bool kingInCheck = isKingInCheck(piece.isWhite);
+
+    // restore board to original state
+    board[startRow][startCol] = piece;
+    board[endRow][endCol] = originalDestinationPiece;
+
+    // if the piece was the king, restore it original position
+    if (piece.type == ChessPieceType.king) {
+      if (piece.isWhite) {
+        whiteKingPosition = originalKingPosition!;
+      } else {
+        blackKingPosition = originalKingPosition!;
+      }
+    }
+
+    return !kingInCheck;
+  }
+  
+
+  // IS IT CHECKMATE ? 
+  bool isCheckMate(bool isWhiteKing) {
+    // if the king is not in check, then it's not checkmate
+    if (!isKingInCheck(isWhiteKing)) {
+      return false;
+    }
+
+    // if there is at least one legal move for any of the player's pieces, then it's not checkmate
+    for (int i = 0; i < 8; i++) {
+      for (int j = 0; j < 8; j++) {
+        // skip empty squares and pieces of other color
+        if (board[i][j] == null || board[i][j]!.isWhite != isWhiteKing) {
+          continue;
+        }
+
+        List<List<int>> pieceValidMoves = 
+            calcualteRealValidMoves(i, j, board[i][j], true);
+
+        // if this piece has any valid moves , then it's not checkmate\
+        if (pieceValidMoves.isNotEmpty) {
+          return false;
+        }
+      }
+    }
+
+    // if none of the above conditions are met, then ther are no legal moves left to be executed
+    // it's checkmate
+    return true;
+  }
+
+  // RESET TO NEW GAME
+  void resetGame() {
+    Navigator.pop(context);
+    _initializeBoard();
+    checkStatus = false;
+    whitePiecesTaken.clear();
+    blackPiecesTaken.clear();
+    whiteKingPosition = [7, 4];
+    blackKingPosition = [0, 4];
+    setState(() {});
+  }
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(
